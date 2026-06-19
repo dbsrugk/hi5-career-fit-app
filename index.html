@@ -933,14 +933,18 @@ function renderTrackBoard(c){
 
 function localFeedbackFor(text){
   const a = analyze(text);
-  const top = a.careers[0];
-  const weakAxis = Object.entries(a.axes).sort((x,y)=>x[1]-y[1])[0];
-  const strongAxis = Object.entries(a.axes).sort((x,y)=>y[1]-x[1])[0];
-  const next = weakAxis[0] === "visual" ? "좋아하는 이미지, 색감, 그림체" :
-    weakAxis[0] === "space" ? "좋아하는 공간이나 화면 구성" :
-    weakAxis[0] === "story" ? "좋아하는 이야기, 세계관, 콘텐츠" :
-    "불편하다고 느낀 앱, 제품, 서비스";
-  return `잠깐 정리해보면, 지금 말에서는 ${top.name} 쪽 신호가 가장 강하게 보여요.\n\n왜냐하면 관심 키워드가 ${top.group} 계열과 잘 맞고, 현재 성향 점수에서 ${AXIS_LABELS[strongAxis[0]]} 축이 가장 높게 나왔기 때문입니다.\n\n지금은 ${top.majors.slice(0,2).join(", ")} 같은 학과군을 열어두고, 다음 대화에서는 ${next}에 대해 조금 더 물어보면 추천이 더 정확해질 것 같아요.`;
+  const asked = messages.length;
+  const interests = a.profile.interests;
+  if (asked <= 1) {
+    return "그렇군요. 좋아하는 방향이 조금 보이기 시작했어요.\n\n그럼 그중에서 직접 해보고 싶은 건 어떤 쪽에 더 가까워요? 손으로 만들거나 그리는 것, 아니면 컴퓨터로 화면이나 이미지를 만드는 것 중에요.";
+  }
+  if (!interests.some(v => /공간|인테리어|전시|건축|카페/.test(v))) {
+    return "좋아요. 지금 말한 관심사를 조금 더 넓게 볼 수 있을 것 같아요.\n\n혹시 공간이나 장소를 꾸미는 것에도 끌리나요, 아니면 캐릭터나 화면처럼 평면적인 결과물을 만드는 쪽이 더 편해요?";
+  }
+  if (!interests.some(v => /브랜드|앱|제품|서비스|로고|패션/.test(v))) {
+    return "그렇군요. 흥미가 꽤 구체적으로 잡히고 있어요.\n\n그럼 결과물을 만들 때 사람들에게 보여주는 분위기나 브랜드 이미지까지 생각하는 편인가요, 아니면 이야기나 장면 자체가 더 중요해요?";
+  }
+  return "좋아요. 이제 판단할 단서가 꽤 쌓였어요.\n\n마지막으로 하나만 더 물어볼게요. 혼자 몰입해서 만드는 방식이 좋아요, 아니면 사람들의 반응을 보면서 고쳐가는 방식이 더 좋아요?";
 }
 
 function isLocalHost(){
@@ -956,19 +960,16 @@ function hasDirectAI(){
 }
 
 function buildAIPrompt(analysis){
-  const top = analysis.careers[0];
-  return `학생의 진로적성 상담 대화와 분석값을 보고, 한국어로 따뜻하지만 과장 없는 피드백을 해주세요.
+  return `학생의 진로적성 상담 대화 중간 응답을 작성해주세요.
 
 규칙:
 - 성적, 내신, 등급, 실기 실력은 묻지 마세요.
-- 진로 성향, 좋아하는 작업 방식, 관련 직업/학과 방향 중심으로 말하세요.
-- 5~7문장 정도로 짧게 답하세요.
-- 마지막에는 다음에 물어볼 좋은 질문 1개를 자연스럽게 던지세요.
+- 직업명, 학과명, 최종 추천, 적합도, 분석 결과를 말하지 마세요.
+- 결론을 미리 내지 말고 "그렇군요", "좋아요", "그 방향도 중요해요"처럼 짧게 반응하세요.
+- 2~3문장만 작성하세요.
+- 마지막에는 자연스러운 다음 질문 1개만 던지세요.
+- 학생이 계속 말하고 싶게 만드는 상담 톤으로 답하세요.
 
-현재 추천 1순위: ${top.name}
-추천 계열: ${top.group}
-관련 학과: ${top.majors.join(", ")}
-입시미술/표현 준비 방향: ${top.art.join(", ")}
 성향 점수: ${Object.entries(analysis.axes).map(([k,v]) => `${AXIS_LABELS[k]} ${v}`).join(", ")}
 관심 키워드: ${analysis.profile.interests.join(", ") || "아직 적음"}
 대화:
@@ -1018,7 +1019,7 @@ async function feedbackFor(text){
     const aiText = await callDirectAI(buildAIPrompt(analysis));
     return aiText || localFeedbackFor("");
   } catch (error) {
-    return `AI 연결을 시도했는데 응답을 받지 못했습니다. 우선 로컬 분석으로 피드백할게요.\n\n${localFeedbackFor("")}`;
+    return localFeedbackFor("");
   }
 }
 
